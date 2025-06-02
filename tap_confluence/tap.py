@@ -3,11 +3,11 @@ from typing import List
 from singer_sdk import Tap
 from singer_sdk.typing import PropertiesList, Property, StringType
 
-from tap_confluence.streams import PagesStream, SpacesStream
+from tap_confluence.streams import BlogpostsStream, PagesStream, SpacesStream
 
 PLUGIN_NAME = "tap-confluence"
 
-STREAM_TYPES = [SpacesStream, PagesStream]
+STREAM_TYPES = [SpacesStream, PagesStream, BlogpostsStream]
 
 
 class TapConfluence(Tap):

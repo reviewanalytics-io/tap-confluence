@@ -112,3 +112,21 @@ class PagesStream(ConfluenceStream):
             params["sort"] = "-modified-date"
 
         return params
+
+
+class BlogpostsStream(ConfluenceStream):
+    name = "blogposts"
+    path = "/blogposts"
+
+    primary_keys = ["id"]  # type: ignore
+
+    def get_url_params(
+        self, context: Mapping[str, Any] | None, next_page_token: Any | None
+    ) -> dict[str, Any] | str:
+        params = super().get_url_params(context, next_page_token)
+
+        if isinstance(params, dict):
+            params["body-format"] = "storage"
+            params["sort"] = "-modified-date"
+
+        return params
