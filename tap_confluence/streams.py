@@ -16,8 +16,8 @@ class ConfluenceStream(RESTStream):
     def url_base(self) -> str:
         """Return the base Confluence URL."""
 
-        base_url = self.config.get("base_url")
-        return f"{base_url}/wiki/api/v2"
+        site_name = self.config.get("site_name")
+        return f"https://{site_name}.atlassian.net/wiki/api/v2"
 
     @property
     def schema_filepath(self) -> Path:
