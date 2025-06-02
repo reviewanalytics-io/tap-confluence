@@ -1,9 +1,7 @@
-from __future__ import annotations
-
-import abc
 from base64 import b64encode
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Iterable, Mapping
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from singer_sdk.streams import RESTStream
@@ -11,15 +9,21 @@ from singer_sdk.streams import RESTStream
 SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 
 
-class TapConfluenceStream(RESTStream):
-
-    limit: int = 100
-    expand: List[str] = []
+class ConfluenceStream(RESTStream):
+    limit = 5
 
     @property
     def url_base(self) -> str:
         """Return the base Confluence URL."""
-        return self.config.get("base_url")
+
+        base_url = self.config.get("base_url")
+        return f"{base_url}/wiki/api/v2"
+
+    @property
+    def schema_filepath(self) -> Path:
+        """Return the schema file path."""
+
+        return SCHEMAS_DIR / f"{self.name}.json"
 
     @property
     def http_headers(self) -> dict:
@@ -34,109 +38,67 @@ class TapConfluenceStream(RESTStream):
         return result
 
     def get_url_params(
-        self,
-        partition: dict | None,
-        next_page_token: int | None,
-    ) -> Dict[str, Any]:
-        return {
+        self, context: Mapping[str, Any] | None, next_page_token: Any | None
+    ) -> dict[str, Any] | str:
+        params = {
             "limit": self.limit,
-            "start": next_page_token,
-            "expand": ",".join(self.expand),
         }
 
+        if next_page_token:
+            params["cursor"] = next_page_token
+
+        return params
+
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
-        resp_json = response.json()
-        for row in resp_json["results"]:
-            # self.logger.info(row.keys())
-            # self.logger.info(row.get("_expandable"))
-            # self.logger.info(row["_links"])
-            yield row
+        json = response.json()
+
+        yield from json.get("results", [])
 
     def get_next_page_token(
         self,
         response: requests.Response,
-        previous_token: int | None,
-    ) -> int | None:
-
-        previous_token = previous_token or 1
+        _: Any | None = None,
+    ) -> Any | None:
+        """Return the next page token."""
 
         data = response.json()
-        size, limit = data["size"], data["limit"]
 
-        if size < limit:
+        try:
+            next_link = data.get("_links", {}).get("next")
+
+            if next_link:
+                parsed = urlparse(next_link)
+                query = parse_qs(parsed.query)
+
+                return query.get("cursor", [None])[0]
+        except Exception as e:  # pylint: disable=broad-except
+            self.logger.error("Error extracting next page token: %s", e)
+
             return None
 
-        return previous_token + limit
+        return None
 
 
-class GroupsStream(TapConfluenceStream):
-    name = "groups"
-    path = "/group"
-    primary_keys = ["id"]
-    schema_filepath = SCHEMAS_DIR / "group.json"
-
-
-class SpacesStream(TapConfluenceStream):
+class SpacesStream(ConfluenceStream):
     name = "spaces"
-    path = "/space"
-    primary_keys = ["id"]
-    schema_filepath = SCHEMAS_DIR / "space.json"
+    path = "/spaces"
 
-    expand = [
-        "permissions",
-        "icon",
-        "description.plain",
-        "description.view",
-    ]
+    primary_keys = ["id"]  # type: ignore
 
 
-class ThemesStream(TapConfluenceStream):
-    name = "themes"
-    path = "/settings/theme"
-    primary_keys = ["themeKey"]
-    schema_filepath = SCHEMAS_DIR / "theme.json"
+class PagesStream(ConfluenceStream):
+    name = "pages"
+    path = "/pages"
 
-    expand = [
-        "icon",
-    ]
-
-
-class BaseContentStream(TapConfluenceStream, metaclass=abc.ABCMeta):
-    path = "/content"
-    primary_keys = ["id"]
-    schema_filepath = SCHEMAS_DIR / "content.json"
-
-    expand = [
-        "history",
-        "history.lastUpdated",
-        "history.previousVersion",
-        "history.contributors",
-        "restrictions.read.restrictions.user",
-        "version",
-        "descendants.comment",
-    ]
-
-    @property
-    @abc.abstractmethod
-    def content_type(self) -> str:
-        """Content type (page or blogpost)."""
-        pass
+    primary_keys = ["id"]  # type: ignore
 
     def get_url_params(
-        self,
-        partition: dict | None,
-        next_page_token: int | None,
-    ) -> Dict[str, Any]:
-        result = super().get_url_params(partition, next_page_token)
-        result["type"] = self.content_type
-        return result
+        self, context: Mapping[str, Any] | None, next_page_token: Any | None
+    ) -> dict[str, Any] | str:
+        params = super().get_url_params(context, next_page_token)
 
+        if isinstance(params, dict):
+            params["body-format"] = "storage"
+            params["sort"] = "-modified-date"
 
-class BlogpostsStream(BaseContentStream):
-    name = "pages"
-    content_type = "page"
-
-
-class PagesStream(BaseContentStream):
-    name = "blogposts"
-    content_type = "blogpost"
+        return params

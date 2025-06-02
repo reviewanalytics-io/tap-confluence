@@ -9,7 +9,7 @@ license = "Apache v2"
 python = ">=3.7.1,<4"
 singer-sdk = "~=0.34.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 black = "^23.3"
 isort = "^5.11.5"
 

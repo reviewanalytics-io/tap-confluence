@@ -139,3 +139,8 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Singer files
+config.json
+catalog.json
+state.json
