@@ -85,6 +85,16 @@ class SpacesStream(ConfluenceStream):
 
     primary_keys = ["id"]  # type: ignore
 
+    def get_url_params(
+        self, context: Mapping[str, Any] | None, next_page_token: Any | None
+    ) -> dict[str, Any] | str:
+        params = super().get_url_params(context, next_page_token)
+
+        if isinstance(params, dict):
+            params["description-format"] = "plain"
+
+        return params
+
 
 class PagesStream(ConfluenceStream):
     name = "pages"
