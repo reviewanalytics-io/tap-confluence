@@ -42,7 +42,7 @@
     },
     "position": {
       "type": [
-        "int",
+        "integer",
         "null"
       ]
     },

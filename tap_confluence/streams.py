@@ -10,7 +10,7 @@ SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 
 
 class ConfluenceStream(RESTStream):
-    limit = 5
+    limit = 100
 
     @property
     def url_base(self) -> str:
