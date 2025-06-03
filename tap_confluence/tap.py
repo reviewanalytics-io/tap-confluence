@@ -16,8 +16,6 @@ class TapConfluence(Tap):
     name = "tap-confluence"
     config_jsonschema = PropertiesList(
         Property("site_name", StringType, required=True),
-        Property("email", StringType, required=True),
-        Property("api_token", StringType, required=True),
         Property("user_agent", StringType),
     ).to_dict()
 

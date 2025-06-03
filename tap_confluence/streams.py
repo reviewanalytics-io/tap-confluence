@@ -1,10 +1,12 @@
-from base64 import b64encode
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlparse
 
 import requests
+from singer_sdk.exceptions import RetriableAPIError
 from singer_sdk.streams import RESTStream
+
+from tap_confluence.authenticator import ConfluenceAuthenticator
 
 SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 
@@ -13,29 +15,22 @@ class ConfluenceStream(RESTStream):
     limit = 100
 
     @property
+    def authenticator(self) -> ConfluenceAuthenticator:
+        """Return the authenticator for this stream."""
+        return ConfluenceAuthenticator(self)
+
+    @property
     def url_base(self) -> str:
         """Return the base Confluence URL."""
 
-        site_name = self.config.get("site_name")
-        return f"https://{site_name}.atlassian.net/wiki/api/v2"
+        cloud_id = self.authenticator.cloud_id
+        return f"https://api.atlassian.com/ex/confluence/{cloud_id}/wiki/api/v2"
 
     @property
     def schema_filepath(self) -> Path:
         """Return the schema file path."""
 
         return SCHEMAS_DIR / f"{self.name}.json"
-
-    @property
-    def http_headers(self) -> dict:
-        result = super().http_headers
-
-        email = self.config.get("email")
-        api_token = self.config.get("api_token")
-        auth = b64encode(f"{email}:{api_token}".encode()).decode()
-
-        result["Authorization"] = f"Basic {auth}"
-
-        return result
 
     def get_url_params(
         self, context: Mapping[str, Any] | None, next_page_token: Any | None
@@ -53,6 +48,32 @@ class ConfluenceStream(RESTStream):
         json = response.json()
 
         yield from json.get("results", [])
+
+    def validate_response(self, response: requests.Response) -> None:
+        msg = (
+            f"{response.status_code} Status Code"
+            f"(Reason: {response.reason}/{response.text}) for path {response.url}"
+        )
+
+        if response.status_code != 200:
+            self.logger.error(msg)
+
+        if response.status_code == 401:
+            self.logger.warning("Authentication failed; refreshing credentials...")
+
+            self.authenticator.update_credentials()
+
+            raise RetriableAPIError(
+                msg,
+                response,
+            )
+
+        if response.status_code == 429:
+            self.logger.warning("Rate limit exceeded. Retrying after a delay...")
+
+            raise RetriableAPIError(msg, response)
+
+        super().validate_response(response)
 
     def get_next_page_token(
         self,
