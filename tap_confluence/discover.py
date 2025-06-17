@@ -20,6 +20,10 @@ def run(context: Context) -> Catalog:
     spaces = chain.from_iterable(context.confluence.spaces())
 
     for space in spaces:
+        # Skip personal spaces
+        if space["type"] == "personal":
+            continue
+
         stream_id = f"space_{space['id']}"
         stream_name = f"{space['name']} ({space['key']})"
 
