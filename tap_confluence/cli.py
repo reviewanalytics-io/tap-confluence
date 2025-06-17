@@ -6,7 +6,6 @@ from tap_confluence import discover, sync
 from tap_confluence.context import Context
 
 REQUIRED_CONFIG_KEYS = [
-    "user_agent",
     "site_name",
     "access_token",
     "refresh_token",
