@@ -1,8 +1,9 @@
 from argparse import Namespace
 from dataclasses import dataclass
 from datetime import datetime
+from logging import Logger
 from typing import Any
-from singer.utils import strptime_to_utc, strftime
+from singer.utils import strftime
 
 from tap_confluence.confluence import Confluence
 
@@ -28,7 +29,7 @@ class Config:
 
 class Context:
     @classmethod
-    def from_args(cls, args: Namespace) -> "Context":
+    def from_args(cls, args: Namespace, logger: Logger) -> "Context":
         config = Config.from_dict(args.config)
         confluence = Confluence(
             oauth={
@@ -46,6 +47,7 @@ class Context:
             config=config,
             config_path=args.config_path,
             state=args.state,
+            logger=logger,
         )
 
     def __init__(
@@ -53,12 +55,14 @@ class Context:
         confluence: Confluence,
         config: Config,
         config_path: str,
+        logger: Logger,
         state: dict | None = None,
     ):
         self.confluence = confluence
         self.config = config
         self.config_path = config_path
         self.state = state or {}
+        self.logger = logger
         self.selected_streams = {}
 
     def get_bookmarks(self) -> dict:
@@ -75,13 +79,6 @@ class Context:
 
         last = path[-1]
         return current.setdefault(last, None)
-
-    def get_start_date(self, path: tuple[str, ...]) -> datetime:
-        value = self.get_bookmark(path)
-        if not value:
-            value = self.config.start_date
-
-        return strptime_to_utc(value)
 
     def set_bookmark(self, path: tuple[str, ...], value: Any) -> None:
         if isinstance(value, datetime):
