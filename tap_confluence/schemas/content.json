@@ -143,6 +143,22 @@
     "version": {
       "$ref": "#/definitions/version"
     },
+    "body": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": ["string", "null"]
+            },
+            "representation": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
     "descendants": {
       "type": "object",
       "properties": {
